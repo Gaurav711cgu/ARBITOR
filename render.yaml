@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: arbiter-core
+    env: docker
+    region: ohio
+    plan: starter
+    healthCheckPath: /health
+    disk:
+      name: ledger-data
+      mountPath: /data
+      sizeGB: 10
+    envVars:
+      - key: ARBITER_API_KEY
+        generateValue: true
