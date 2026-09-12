@@ -32,7 +32,7 @@ import java.util.Map;
 public final class ArbiterApplication {
     private final FileLedgerRepository repository;
     private final AuditEventPublisher audit;
-    private final LedgerRepository ledgerRepository;
+    
     private final ApiAuth auth;
     private final SettlementSaga settlementSaga;
     private final Iso20022MessageParser isoParser = new Iso20022MessageParser();
@@ -197,7 +197,7 @@ public final class ArbiterApplication {
             respond(exchange, 405, "{\"error\":\"method not allowed\"}");
             return;
         }
-        List<String> txIds = ledgerRepository.getRecentTransactions();
+        List<String> txIds = repository.getRecentTransactions();
         StringBuilder json = new StringBuilder("[");
         for (int i = 0; i < txIds.size(); i++) {
             String tx = txIds.get(i);
