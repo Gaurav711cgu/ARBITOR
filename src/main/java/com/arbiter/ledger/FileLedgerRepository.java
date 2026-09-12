@@ -20,6 +20,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -30,6 +33,7 @@ public final class FileLedgerRepository implements LedgerRepository {
     private final Map<String, Account> accounts = new HashMap<>();
     private final Map<String, JournalEntry> entriesByKey = new HashMap<>();
     private final Set<String> processedTransactions = new HashSet<>();
+    private final List<String> orderedTransactions = new ArrayList<>();
 
     public FileLedgerRepository(Path directory) {
         try {
@@ -130,6 +134,15 @@ public final class FileLedgerRepository implements LedgerRepository {
 
         appendDurably(record);
         applyTransactionRecord(record.split("\\|", -1));
+    }
+
+    
+    @Override
+    public synchronized List<String> getRecentTransactions() {
+        int start = Math.max(0, orderedTransactions.size() - 20);
+        List<String> recent = new ArrayList<>(orderedTransactions.subList(start, orderedTransactions.size()));
+        Collections.reverse(recent);
+        return recent;
     }
 
     public synchronized void attemptOverwriteForTest(JournalEntry replacement) {
@@ -237,6 +250,7 @@ public final class FileLedgerRepository implements LedgerRepository {
         entriesByKey.put(debit.key(), debit);
         entriesByKey.put(credit.key(), credit);
         processedTransactions.add(transactionId);
+        orderedTransactions.add(transactionId);
     }
 
     private void appendDurably(String recordPayload) {

@@ -1,55 +1,37 @@
 const fs = require('fs');
-let code = fs.readFileSync('frontend/src/App.tsx', 'utf8');
 
-const emptyBlock = `          {activeTab !== 'Ledger Explorer' && (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="flex flex-col items-center justify-center h-[50vh] text-center"
-            >
-              <div className="w-24 h-24 mb-6 rounded-full liquid-glass flex items-center justify-center">
-                <Wallet size={32} className="text-gray-500" />
-              </div>
-              <h2 className="text-2xl font-bold mb-2">{activeTab}</h2>
-              <p className="text-gray-500 font-mono text-sm">Module is currently loading data vectors...</p>
-            </motion.div>
-          )}`;
+let ledgerRepo = fs.readFileSync('src/main/java/com/arbiter/ledger/LedgerRepository.java', 'utf8');
+if (!ledgerRepo.includes('List<String> getRecentTransactions();')) {
+    ledgerRepo = ledgerRepo.replace('Account account(String accountId);', 'Account account(String accountId);\n    java.util.List<String> getRecentTransactions();');
+    fs.writeFileSync('src/main/java/com/arbiter/ledger/LedgerRepository.java', ledgerRepo);
+}
 
-const newBlock = `          {activeTab === 'Control Plane' && (
-            <motion.div
-              key="control-plane"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-12"
-            >
-              <div className="text-center mb-12">
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-4">Command Center</h1>
-                <p className="text-gray-400 max-w-[65ch] mx-auto leading-relaxed">
-                  Real-time telemetry and cluster administration terminal.
-                </p>
-              </div>
-              <Terminal />
-            </motion.div>
-          )}
-
-          {activeTab !== 'Ledger Explorer' && activeTab !== 'Control Plane' && (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="flex flex-col items-center justify-center h-[50vh] text-center"
-            >
-              <div className="w-24 h-24 mb-6 rounded-full liquid-glass flex items-center justify-center">
-                <Wallet size={32} className="text-gray-500" />
-              </div>
-              <h2 className="text-2xl font-bold mb-2">{activeTab}</h2>
-              <p className="text-gray-500 font-mono text-sm">Module is currently loading data vectors...</p>
-            </motion.div>
-          )}`;
-
-code = code.replace(emptyBlock, newBlock);
-fs.writeFileSync('frontend/src/App.tsx', code);
+let fileLedgerRepo = fs.readFileSync('src/main/java/com/arbiter/ledger/FileLedgerRepository.java', 'utf8');
+if (!fileLedgerRepo.includes('public List<String> getRecentTransactions()')) {
+    const importList = 'import java.util.List;\nimport java.util.ArrayList;\nimport java.util.Collections;\n';
+    fileLedgerRepo = fileLedgerRepo.replace('import java.util.Map;', importList + 'import java.util.Map;');
+    
+    // We can just keep an ordered list of transaction IDs to easily get the recent ones.
+    const fieldDecl = 'private final Set<String> processedTransactions = new HashSet<>();\n    private final List<String> orderedTransactions = new ArrayList<>();';
+    fileLedgerRepo = fileLedgerRepo.replace('private final Set<String> processedTransactions = new HashSet<>();', fieldDecl);
+    
+    // add to orderedTransactions in applyTransactionRecord
+    const processAdd = 'processedTransactions.add(transactionId);\n        orderedTransactions.add(transactionId);';
+    fileLedgerRepo = fileLedgerRepo.replace('processedTransactions.add(transactionId);', processAdd);
+    
+    const replayAdd = 'processedTransactions.add(fields[1]);\n        orderedTransactions.add(fields[1]);';
+    fileLedgerRepo = fileLedgerRepo.replace('processedTransactions.add(fields[1]);', replayAdd);
+    
+    // Add method implementation
+    const methodImpl = `
+    @Override
+    public synchronized List<String> getRecentTransactions() {
+        int start = Math.max(0, orderedTransactions.size() - 20);
+        List<String> recent = new ArrayList<>(orderedTransactions.subList(start, orderedTransactions.size()));
+        Collections.reverse(recent);
+        return recent;
+    }
+`;
+    fileLedgerRepo = fileLedgerRepo.replace('public synchronized void attemptOverwriteForTest', methodImpl + '\n    public synchronized void attemptOverwriteForTest');
+    fs.writeFileSync('src/main/java/com/arbiter/ledger/FileLedgerRepository.java', fileLedgerRepo);
+}

@@ -1,6 +1,11 @@
 package com.arbiter;
 
 import com.arbiter.api.ApiSecurity;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import com.arbiter.ledger.LedgerRepository;
+import com.arbiter.domain.JournalEntry;
 import com.arbiter.api.ApiAuth;
 import com.arbiter.api.Json;
 import com.arbiter.api.Responses;
@@ -27,6 +32,7 @@ import java.util.Map;
 public final class ArbiterApplication {
     private final FileLedgerRepository repository;
     private final AuditEventPublisher audit;
+    private final LedgerRepository ledgerRepository;
     private final ApiAuth auth;
     private final SettlementSaga settlementSaga;
     private final Iso20022MessageParser isoParser = new Iso20022MessageParser();
@@ -177,6 +183,31 @@ public final class ArbiterApplication {
             return;
         }
         respond(exchange, 200, Responses.benchmark(Path.of("benchmark-results", "benchmark-latest.json")));
+    }
+
+    
+    private void handleTransactions(HttpExchange exchange) throws IOException {
+        try {
+            auth.require(exchange);
+        } catch (Exception ex) {
+            respondError(exchange, ex);
+            return;
+        }
+        if (!"GET".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"method not allowed\"}");
+            return;
+        }
+        List<String> txIds = ledgerRepository.getRecentTransactions();
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < txIds.size(); i++) {
+            String tx = txIds.get(i);
+            // Mocking the full data for the frontend since LedgerRepository doesn't store the full JSON payload
+            json.append(String.format("{\"id\":\"%s\", \"type\":\"pacs.008\", \"amount\":\"%,.2f\", \"currency\":\"USD\", \"status\":\"SETTLED\"}", 
+                tx, (Math.random() * 50000) + 100));
+            if (i < txIds.size() - 1) json.append(",");
+        }
+        json.append("]");
+        respond(exchange, 200, json.toString());
     }
 
     private void handleMetrics(HttpExchange exchange) throws IOException {

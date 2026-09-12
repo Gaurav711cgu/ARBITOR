@@ -19,8 +19,13 @@ const COMMANDS = [
 export function Terminal() {
   const [lines, setLines] = useState<{text: string, type: string}[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent StrictMode double execution
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     let i = 0;
     const interval = setInterval(() => {
       if (i < COMMANDS.length) {
@@ -45,21 +50,25 @@ export function Terminal() {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       className="w-full max-w-4xl mx-auto liquid-glass rounded-xl overflow-hidden shadow-2xl"
+      role="region"
+      aria-label="Terminal Output"
     >
       {/* Terminal Header */}
-      <div className="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center gap-4">
+      <div className="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center gap-4" aria-hidden="true">
         <div className="flex gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
           <div className="w-3 h-3 rounded-full bg-amber-500/80"></div>
           <div className="w-3 h-3 rounded-full bg-emerald-500/80"></div>
         </div>
-        <div className="font-mono text-xs text-gray-500 flex-1 text-center">root@arbiter-core:~</div>
+        <div className="font-mono text-xs text-gray-400 flex-1 text-center">root@arbiter-core:~</div>
       </div>
       
       {/* Terminal Body */}
       <div 
         ref={containerRef}
-        className="p-6 h-[400px] overflow-y-auto font-mono text-sm space-y-2 scroll-smooth"
+        className="p-6 h-[400px] overflow-y-auto font-mono text-sm space-y-2 scroll-smooth focus:outline-none"
+        tabIndex={0}
+        aria-live="polite"
       >
         {lines.map((line, idx) => (
           <motion.div 
@@ -72,20 +81,16 @@ export function Terminal() {
               line.type === 'success' ? 'text-emerald-400' :
               line.type === 'warn' ? 'text-amber-400' :
               line.type === 'info' ? 'text-cyan-400' :
-              'text-gray-400'
+              'text-gray-300'
             }`}
           >
-            {line.type === 'cmd' && <span className="text-emerald-500">➜</span>}
+            {line.type === 'cmd' && <span className="text-emerald-500" aria-hidden="true">➜</span>}
             <span className="flex-1">{line.text}</span>
           </motion.div>
         ))}
         <div className="flex gap-3 text-white">
-          <span className="text-emerald-500">➜</span>
-          <motion.span 
-            animate={{ opacity: [1, 0, 1] }} 
-            transition={{ duration: 1, repeat: Infinity }}
-            className="w-2 h-4 bg-gray-400 inline-block mt-1"
-          />
+          <span className="text-emerald-500" aria-hidden="true">➜</span>
+          <span className="w-2 h-4 bg-gray-400 inline-block mt-1 animate-cursor-blink" aria-hidden="true" />
         </div>
       </div>
     </motion.div>
