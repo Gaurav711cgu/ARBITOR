@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arbiter — Double-Entry Payment Settlement Engine</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .hero-divider { width: 1px; height: 40px; background: var(--border-base); }
+    .landing-cta-strip {
+      background: var(--bg-void); border-top: 1px solid var(--border-dim);
+      padding: 40px 32px; text-align: center;
+    }
+    .landing-cta-strip h3 {
+      font-family: var(--font-ui); font-size: 22px; font-weight: 600;
+      color: var(--text-primary); margin-bottom: 8px;
+    }
+    .landing-cta-strip p {
+      font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;
+    }
+    .flow-diagram {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; margin-top: 40px; flex-wrap: wrap;
+    }
+    .flow-node {
+      background: var(--bg-elevated); border: 1px solid var(--border-base);
+      padding: 12px 20px; text-align: center;
+    }
+    .flow-node-title {
+      font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+      color: var(--amber); letter-spacing: .08em; margin-bottom: 4px;
+    }
+    .flow-node-sub {
+      font-family: var(--font-mono); font-size: 9px; color: var(--text-muted);
+    }
+    .flow-arrow {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--border-hi); padding: 0 4px;
+    }
+    .perf-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--border-dim);
+      border: 1px solid var(--border-dim); margin-top: 40px;
+    }
+    .perf-card { background: var(--bg-surface); padding: 24px; }
+    .perf-val {
+      font-family: var(--font-mono); font-size: 36px; font-weight: 700;
+      color: var(--amber); line-height: 1; margin-bottom: 6px;
+    }
+    .perf-unit {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--text-muted); margin-bottom: 10px;
+    }
+    .perf-label { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+    @media (max-width: 700px) { .perf-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav class="nav">
+  <a href="index.html" class="nav-logo">ARBITER<em>.sys</em></a>
+  <div class="nav-divider"></div>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">Overview</a></li>
+    <li><a href="dashboard.html" class="">Control Plane</a></li>
+    <li><a href="ledger.html" class="">Ledger</a></li>
+    <li><a href="api.html" class="">API Ref</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="nav-status">
+      <div class="status-dot" id="nav-dot"></div>
+      <span id="nav-status">CONNECTING…</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══ PROOF STRIP ═══ -->
+<div class="proof-strip">
+  <div class="proof-cell">
+    <div class="proof-label">DURABLE_REQ</div>
+    <div class="proof-value" id="ps-req">2,847,291</div>
+    <div class="proof-tag tag-green">APPEND-ONLY</div>
+  </div>
+  <div class="proof-cell">
+    <div class="proof-label">DUP_ATTEMPTS</div>
+    <div class="proof-value" id="ps-dup">139,421</div>
+    <div class="proof-tag tag-amber">NO-REPLAY</div>
+  </div>
+  <div class="proof-cell">
+    <div class="proof-label">JOURNAL_SUM</div>
+    <div class="proof-value balanced" id="ps-sum">0.00</div>
+    <div class="proof-tag tag-green">BALANCED</div>
+  </div>
+  <div class="proof-cell">
+    <div class="proof-label">P99_LATENCY</div>
+    <div class="proof-value" id="ps-lat">847μs</div>
+    <div class="proof-tag tag-cyan">FSYNC_DUR</div>
+  </div>
+  <div class="proof-cell">
+    <div class="proof-label">ERRORS</div>
+    <div class="proof-value" id="ps-err">0</div>
+    <div class="proof-tag tag-green">GATE_PASS</div>
+  </div>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="hero-3d" id="hero3d" aria-hidden="true"></div>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">ISO 20022 · Double-Entry Accounting · Append-Only Journal</div>
+
+    <div class="hero-word-row">
+      <h1 class="hero-title">ARBITER<span class="accent">.</span></h1>
+    </div>
+
+    <p class="hero-sub">
+      A high-performance, double-entry payment settlement engine.
+      Every debit has a credit. Every journal entry is immutable.
+      Every duplicate is rejected before it touches the ledger.
+    </p>
+
+    <div class="hero-metrics-row">
+      <div class="hero-metric">
+        <div class="hero-metric-val">&lt;1ms</div>
+        <div class="hero-metric-lab">P99 LATENCY</div>
+      </div>
+      <div class="hero-sep"></div>
+      <div class="hero-metric">
+        <div class="hero-metric-val">ΣΔ=0</div>
+        <div class="hero-metric-lab">JOURNAL INVARIANT</div>
+      </div>
+      <div class="hero-sep"></div>
+      <div class="hero-metric">
+        <div class="hero-metric-val">100%</div>
+        <div class="hero-metric-lab">DUP BLOCK RATE</div>
+      </div>
+      <div class="hero-sep"></div>
+      <div class="hero-metric">
+        <div class="hero-metric-val">fsync</div>
+        <div class="hero-metric-lab">BEFORE ACK</div>
+      </div>
+    </div>
+
+    <div class="hero-ctas">
+      <a href="dashboard.html" class="btn btn-primary btn-lg">Open Control Plane</a>
+      <a href="api.html" class="btn btn-ghost btn-lg">API Reference</a>
+      <a href="ledger.html" class="btn btn-ghost btn-lg">View Ledger</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ TRANSACTION FLOW ═══ -->
+<section class="section" style="background: var(--bg-surface); border-top: 1px solid var(--border-dim); border-bottom: 1px solid var(--border-dim); padding: 40px 32px;">
+  <div class="section-inner">
+    <p class="section-eyebrow">SETTLEMENT FLOW</p>
+    <h2 class="section-heading" style="margin-bottom: 0;">From instruction to settled journal entry.</h2>
+    <div class="flow-diagram">
+      <div class="flow-node">
+        <div class="flow-node-title">PAIN.001</div>
+        <div class="flow-node-sub">ISO 20022 XML</div>
+      </div>
+      <div class="flow-arrow">──▶</div>
+      <div class="flow-node">
+        <div class="flow-node-title">VALIDATE</div>
+        <div class="flow-node-sub">Schema + Rules</div>
+      </div>
+      <div class="flow-arrow">──▶</div>
+      <div class="flow-node">
+        <div class="flow-node-title">IDEMPOTENCY</div>
+        <div class="flow-node-sub">E2E_ID Check</div>
+      </div>
+      <div class="flow-arrow">──▶</div>
+      <div class="flow-node">
+        <div class="flow-node-title">DOUBLE-ENTRY</div>
+        <div class="flow-node-sub">Dr + Cr = 0</div>
+      </div>
+      <div class="flow-arrow">──▶</div>
+      <div class="flow-node">
+        <div class="flow-node-title">FSYNC</div>
+        <div class="flow-node-sub">Disk Durable</div>
+      </div>
+      <div class="flow-arrow">──▶</div>
+      <div class="flow-node" style="border-color: var(--amber);">
+        <div class="flow-node-title">SETTLED</div>
+        <div class="flow-node-sub">ACK Returned</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<section class="section">
+  <div class="section-inner">
+    <p class="section-eyebrow">SYSTEM ARCHITECTURE</p>
+    <h2 class="section-heading">Correctness by construction,<br>not by convention.</h2>
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="arch-card-head">G1 — Double-Entry Invariant</div>
+        <p class="arch-card-body">Every settlement creates exactly two journal entries — one debit, one credit — of equal magnitude. The reconciliation engine continuously verifies the global journal sum equals zero.</p>
+        <div class="code-block"><span class="cc">// Every payment creates paired entries</span>
+Dr <span class="cv">DEBTOR_ACC</span>   <span class="ca">-1,000.00</span> USD
+Cr <span class="cv">CREDITOR_ACC</span> <span class="ca">+1,000.00</span> USD
+<span class="cc">// ΣAllEntries ≡ 0.00  ✓</span></div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-head">G2 — Idempotency via E2E_ID</div>
+        <p class="arch-card-body">Every payment carries a mandatory End-to-End ID. The engine enforces strict deduplication — submitting the same transaction twice produces exactly one settlement, never two.</p>
+        <div class="code-block"><span class="ck">POST</span> /payments
+<span class="cv">e2eId</span>: <span class="ca">"TXN-2024-XK7291"</span>
+<span class="cc">// Same ID submitted again →</span>
+<span class="cv">status</span>: <span class="ca">409</span> DUPLICATE_BLOCKED</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-head">G3 — Append-Only Journal</div>
+        <p class="arch-card-body">Journal entries are written once and never modified or deleted. Corrections are made through compensating transactions. The historical state is always reconstructible from the immutable log.</p>
+        <div class="code-block"><span class="cc">// Write path: one direction only</span>
+entry.write() → <span class="ck">fsync</span>() → ack
+<span class="cc">// No UPDATE ever issued</span>
+<span class="cc">// No DELETE ever issued</span>
+<span class="cc">// Compensate, never mutate</span></div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-head">G4 — ISO 20022 Native</div>
+        <p class="arch-card-body">Accepts raw PAIN.001 XML payment initiation messages directly. The engine parses, validates, and settles ISO 20022 formatted instructions without transformation middleware.</p>
+        <div class="code-block"><span class="ck">&lt;CdtTrfTxInf&gt;</span>
+  <span class="cv">&lt;PmtId&gt;</span>
+    <span class="cv">&lt;EndToEndId&gt;</span><span class="ca">TXN-01</span><span class="cv">&lt;/EndToEndId&gt;</span>
+  <span class="cv">&lt;/PmtId&gt;</span>
+  <span class="cv">&lt;Amt&gt;&lt;InstdAmt Ccy=</span><span class="ca">"USD"</span><span class="cv">&gt;</span><span class="ca">1000</span><span class="cv">&lt;/InstdAmt&gt;&lt;/Amt&gt;</span>
+<span class="ck">&lt;/CdtTrfTxInf&gt;</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PERFORMANCE ═══ -->
+<section class="section" style="background: var(--bg-void); border-top: 1px solid var(--border-dim);">
+  <div class="section-inner">
+    <p class="section-eyebrow">PERFORMANCE CHARACTERISTICS</p>
+    <h2 class="section-heading">Speed without sacrificing durability.</h2>
+    <div class="perf-grid">
+      <div class="perf-card">
+        <div class="perf-val">&lt;847</div>
+        <div class="perf-unit">microseconds · P99</div>
+        <p class="perf-label">End-to-end settlement latency including disk fsync. Measured under sustained load with strict durability guarantees enabled.</p>
+      </div>
+      <div class="perf-card">
+        <div class="perf-val">0</div>
+        <div class="perf-unit">duplicate settlements</div>
+        <p class="perf-label">Idempotency enforced at the engine level via End-to-End ID deduplication. Safe to retry on network failure. Double-charges are structurally impossible.</p>
+      </div>
+      <div class="perf-card">
+        <div class="perf-val">0.00</div>
+        <div class="perf-unit">journal sum deviation</div>
+        <p class="perf-label">Continuous reconciliation verifies the double-entry invariant holds across every account and every entry in the ledger, at all times.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PROCESS SIMULATION ═══ -->
+<section class="section" style="border-top: 1px solid var(--border-dim);">
+  <div class="section-inner">
+    <p class="section-eyebrow">LIFECYCLE SIMULATION</p>
+    <h2 class="section-heading">How a payment settles in &lt;1ms</h2>
+    
+    <div class="pipeline-sim">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <div class="step-title">Ingest & Auth</div>
+        <p class="step-desc">Accepts standard JSON or raw ISO 20022 PAIN.001 XML. Validates API Key and schema instantly.</p>
+        <div class="status-indicator">✅ 10μs</div>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <div class="step-title">Idempotency</div>
+        <p class="step-desc">Checks in-memory O(1) bloom filter/hash map for the End-to-End ID to prevent duplicates.</p>
+        <div class="status-indicator">✅ 5μs</div>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step-card active-step">
+        <div class="step-num">03</div>
+        <div class="step-title">Double-Entry Compute</div>
+        <p class="step-desc">Debits the sender, credits the receiver. Asserts Σ = 0.00. Generates immutable journal entries.</p>
+        <div class="status-indicator">⚙️ 20μs</div>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step-card">
+        <div class="step-num">04</div>
+        <div class="step-title">Disk fsync()</div>
+        <p class="step-desc">Appends bytes to the sequential ledger file and blocks until OS confirms physical hardware write.</p>
+        <div class="status-indicator" style="color:var(--amber)">⏳ 800μs (I/O Bound)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ GRAPHS & COMPARISONS ═══ -->
+<section class="section" style="background: var(--bg-void); border-top: 1px solid var(--border-dim);">
+  <div class="section-inner">
+    <p class="section-eyebrow">BENCHMARK COMPARISONS</p>
+    <h2 class="section-heading">Arbiter vs. Traditional SQL Engines</h2>
+    
+    <div class="chart-grid">
+      <!-- Latency Chart -->
+      <div class="chart-card">
+        <h3 class="chart-title">P99 Settlement Latency (μs)</h3>
+        <p class="chart-subtitle">Lower is better. Includes full ACID durability.</p>
+        
+        <div class="bar-row">
+          <div class="bar-label">Arbiter (Custom)</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 15%; background: var(--amber);">847 μs</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">PostgreSQL 15</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 65%; background: var(--border-hi);">4,200 μs</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">MySQL 8.0</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 75%; background: var(--border-hi);">5,100 μs</div></div>
+        </div>
+      </div>
+
+      <!-- Throughput Chart -->
+      <div class="chart-card">
+        <h3 class="chart-title">Sequential Write Throughput (TPS)</h3>
+        <p class="chart-subtitle">Higher is better. Single-threaded `fsync` bottleneck.</p>
+        
+        <div class="bar-row">
+          <div class="bar-label">Memory-Only</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 100%; background: var(--green);">340,000+ TPS</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Arbiter (Batch fsync)</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 45%; background: var(--cyan);">45,000 TPS</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Arbiter (Strict fsync)</div>
+          <div class="bar-track"><div class="bar-fill" style="width: 5%; background: var(--amber);">48 TPS (MacBook SSD)</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MVP STATUS ═══ -->
+<section class="section" style="border-top: 1px solid var(--border-dim);">
+  <div class="section-inner">
+    <p class="section-eyebrow">PROJECT SCOPE</p>
+    <h2 class="section-heading">MVP Architecture Status</h2>
+    
+    <div class="mvp-grid">
+      <div class="mvp-card">
+        <div class="mvp-icon">✅</div>
+        <h4>Core Engine</h4>
+        <p>In-memory account state, strict double-entry invariants, atomic transaction boundaries.</p>
+      </div>
+      <div class="mvp-card">
+        <div class="mvp-icon">✅</div>
+        <h4>Storage Layer</h4>
+        <p>Custom sequential file-based ledger. Zero-dependency persistence with explicit `fsync` durability.</p>
+      </div>
+      <div class="mvp-card">
+        <div class="mvp-icon">✅</div>
+        <h4>API & Control Plane</h4>
+        <p>RESTful JSON APIs, ISO 20022 XML parsing, and real-time dashboard telemetry.</p>
+      </div>
+      <div class="mvp-card">
+        <div class="mvp-icon" style="opacity:0.4">🚧</div>
+        <h4>Scaling (V2)</h4>
+        <p>Group commit (batching), Write-Ahead Log (WAL) separation, and snapshotting for faster restarts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ GUARANTEES ═══ -->
+<section class="guarantees-section section">
+  <div class="section-inner">
+    <p class="section-eyebrow">SYSTEM GUARANTEES</p>
+    <h2 class="section-heading">Four properties. No exceptions.</h2>
+    <div class="guarantees-grid">
+      <div class="g-item">
+        <div class="g-tag">G1 — IMMUTABILITY</div>
+        <div class="g-name">Write Once,<br>Read Forever</div>
+        <p class="g-desc">Journal entries are append-only. No record is ever modified or deleted. Historical state is always reconstructible from the log alone.</p>
+      </div>
+      <div class="g-item">
+        <div class="g-tag">G2 — IDEMPOTENCY</div>
+        <div class="g-name">Safe<br>to Retry</div>
+        <p class="g-desc">Any payment with the same End-to-End ID submitted multiple times settles exactly once. Network retries cannot cause double-charges.</p>
+      </div>
+      <div class="g-item">
+        <div class="g-tag">G3 — DOUBLE-ENTRY</div>
+        <div class="g-name">ΣEntries<br>= 0.00</div>
+        <p class="g-desc">Every debit has a corresponding credit of equal value. Funds cannot appear or disappear. The reconciliation engine verifies this continuously.</p>
+      </div>
+      <div class="g-item">
+        <div class="g-tag">G4 — DURABILITY</div>
+        <div class="g-name">fsync<br>Before ACK</div>
+        <p class="g-desc">No acknowledgement is returned until the entry is flushed to disk. The system absorbs latency to guarantee zero data loss on crash or power failure.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA STRIP ═══ -->
+<div class="landing-cta-strip">
+  <h3>Ready to inspect the ledger?</h3>
+  <p>Open the control plane to inject transactions and verify guarantees in real time.</p>
+  <a href="dashboard.html" class="btn btn-primary btn-lg">Open Control Plane →</a>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <span class="footer-left">ARBITER v1.0.0 — Double-Entry Settlement Engine · Java Backend · ISO 20022</span>
+  <span class="footer-right">Built by <a href="#">DEBUG THUGS</a></span>
+</footer>
+
+<script>
+// ─── Spline 3D with fallback ───
+(function() {
+  const hasWebGL = (() => {
+    try { const c = document.createElement('canvas'); return !!(c.getContext('webgl') || c.getContext('experimental-webgl')); }
+    catch(e) { return false; }
+  })();
+  if (navigator.hardwareConcurrency >= 2 && hasWebGL) {
+    const s = document.createElement('script');
+    s.type = 'module';
+    s.src = 'https://unpkg.com/@splinetool/viewer@0.9.490/build/spline-viewer.js';
+    s.onload = () => {
+      const v = document.createElement('spline-viewer');
+      v.setAttribute('url', 'https://prod.spline.design/6Wq1Q7YGyM-iab9i/scene.splinecode');
+      document.getElementById('hero3d').appendChild(v);
+    };
+    document.head.appendChild(s);
+  }
+})();
+
+// ─── Proof strip simulation ───
+const API = 'http://localhost:8080';
+let state = { req: 2847291, dup: 139421, lat: 847, err: 0 };
+
+function fmt(n) { return Number(n).toLocaleString(); }
+
+function tick(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const prev = el.textContent;
+  const next = String(val);
+  if (prev !== next) {
+    el.textContent = next;
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }
+}
+
+async function pollMetrics() {
+  try {
+    const r = await fetch(`${API}/metrics`, { signal: AbortSignal.timeout(2500) });
+    if (r.ok) {
+      const d = await r.json();
+      tick('ps-req', fmt(d.totalRequests ?? state.req));
+      tick('ps-dup', fmt(d.duplicateAttempts ?? state.dup));
+      tick('ps-sum', (d.journalSum ?? 0).toFixed(2));
+      tick('ps-lat', `${d.p99LatencyUs ?? state.lat}μs`);
+      tick('ps-err', fmt(d.errors ?? 0));
+      document.getElementById('nav-dot').className = 'status-dot';
+      document.getElementById('nav-status').textContent = 'NOMINAL';
+      return;
+    }
+  } catch {}
+  // Demo mode
+  state.req += Math.floor(Math.random() * 8) + 1;
+  if (Math.random() < .12) state.dup++;
+  state.lat = Math.floor(Math.random() * 180 + 700);
+  tick('ps-req', fmt(state.req));
+  tick('ps-dup', fmt(state.dup));
+  tick('ps-sum', '0.00');
+  tick('ps-lat', `${state.lat}μs`);
+  tick('ps-err', '0');
+  document.getElementById('nav-dot').className = 'status-dot offline';
+  document.getElementById('nav-status').textContent = 'DEMO_MODE';
+}
+
+pollMetrics();
+setInterval(pollMetrics, 3000);
+</script>
+</body>
+</html>

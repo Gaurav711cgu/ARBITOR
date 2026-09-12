@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Ref — Arbiter</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow-y: hidden; } /* Layout handles scrolling */
+    .api-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      height: calc(100vh - 46px); /* 46px is top nav */
+    }
+    .api-sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-base);
+      padding: 32px 24px;
+      overflow-y: auto;
+    }
+    .api-sidebar-group { margin-bottom: 24px; }
+    .api-sidebar-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    .api-sidebar-links a {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 13px;
+      padding: 6px 0;
+      text-decoration: none;
+      transition: color var(--fast);
+    }
+    .api-sidebar-links a:hover, .api-sidebar-links a.active {
+      color: var(--amber);
+    }
+    
+    .api-content {
+      padding: 48px 64px;
+      overflow-y: auto;
+      max-width: 900px;
+    }
+    .api-endpoint {
+      margin-bottom: 64px;
+    }
+    .api-endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .method-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: var(--r1);
+    }
+    .method-badge.post { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240, 165, 0, 0.2); }
+    .method-badge.get { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0, 200, 150, 0.2); }
+    
+    .endpoint-path {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      color: var(--text-primary);
+    }
+    
+    .api-desc {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    
+    .code-block {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-deep);
+      border-radius: var(--r2);
+      padding: 16px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+    .code-block pre {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-primary);
+      margin: 0;
+    }
+    
+    .api-title {
+      font-family: var(--font-ui);
+      font-size: 32px;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+    hr {
+      border: 0;
+      border-bottom: 1px solid var(--border-base);
+      margin: 40px 0;
+    }
+  </style>
+</head>
+<body class="theme-dark">
+
+  <!-- Top Navigation -->
+  <nav class="nav">
+  <a href="index.html" class="nav-logo">ARBITER<em>.sys</em></a>
+  <div class="nav-divider"></div>
+  <ul class="nav-links">
+    <li><a href="index.html" class="">Overview</a></li>
+    <li><a href="dashboard.html" class="">Control Plane</a></li>
+    <li><a href="ledger.html" class="">Ledger</a></li>
+    <li><a href="api.html" class="active">API Ref</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="nav-status">
+      <div class="status-dot" id="nav-dot"></div>
+      <span id="nav-status">CONNECTING…</span>
+    </div>
+  </div>
+</nav>
+
+  <div class="api-layout">
+    <aside class="api-sidebar">
+      <div class="api-sidebar-group">
+        <div class="api-sidebar-title">Core Endpoints</div>
+        <div class="api-sidebar-links">
+          <a href="#accounts" class="active">Accounts</a>
+          <a href="#payments">Payments</a>
+          <a href="#iso20022">ISO 20022</a>
+        </div>
+      </div>
+      <div class="api-sidebar-group">
+        <div class="api-sidebar-title">System</div>
+        <div class="api-sidebar-links">
+          <a href="#reconcile">Reconcile</a>
+          <a href="#metrics">Metrics</a>
+        </div>
+      </div>
+    </aside>
+
+    <main class="api-content">
+      <h1 class="api-title">API Reference</h1>
+      <p class="api-desc">Integrate with Arbiter's double-entry settlement engine via standard REST APIs. All endpoints require the <code>X-API-Key</code> or <code>x-arbiter-api-key</code> header.</p>
+      
+      <hr>
+      
+      <section id="accounts" class="api-endpoint">
+        <div class="api-endpoint-header">
+          <span class="method-badge post">POST</span>
+          <span class="endpoint-path">/accounts</span>
+        </div>
+        <p class="api-desc">Initialize a new ledger account with a starting balance.</p>
+        <div class="code-block">
+<pre>{
+  "accountId": "Treasury:Operating",
+  "currency": "USD",
+  "openingBalance": "500000.00"
+}</pre>
+        </div>
+      </section>
+
+      <section id="payments" class="api-endpoint">
+        <div class="api-endpoint-header">
+          <span class="method-badge post">POST</span>
+          <span class="endpoint-path">/payments</span>
+        </div>
+        <p class="api-desc">Execute a standard ledger payment instruction. Must strictly balance to 0.</p>
+        <div class="code-block">
+<pre>{
+  "endToEndId": "TX-001",
+  "debtorAccountId": "CustomerA",
+  "creditorAccountId": "CustomerB",
+  "amount": "125.00",
+  "currency": "USD",
+  "purposeCode": "GDDS"
+}</pre>
+        </div>
+      </section>
+      
+      <section id="reconcile" class="api-endpoint">
+        <div class="api-endpoint-header">
+          <span class="method-badge get">GET</span>
+          <span class="endpoint-path">/reconcile</span>
+        </div>
+        <p class="api-desc">Trigger a real-time invariant check across the entire ledger state.</p>
+        <div class="code-block">
+<pre>GET /reconcile
+X-API-Key: YOUR_KEY</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+</body>
+</html>

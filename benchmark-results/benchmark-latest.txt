@@ -1,0 +1,28 @@
+Arbiter Durable Ledger Benchmark
+=================================
+completedAt: 2026-09-12T14:44:58.142204Z
+workers: 8
+durableStore: append-only file ledger with checksum and fsync
+
+settlementRequests: 10000
+settled: 10000
+settlementSeconds: 205.541
+settlementsPerSecond: 48.652
+latencyMicrosP50: 156649
+latencyMicrosP95: 227615
+latencyMicrosP99: 470084
+
+duplicateAttempts: 10000
+duplicateResponses: 10000
+duplicateSeconds: 30.186
+duplicateResponsesPerSecond: 331.275
+
+fraudDeclineRequests: 1000
+fraudDeclines: 1000
+fraudSeconds: 12.065
+fraudDeclinesPerSecond: 82.882
+
+journalEntryCount: 20000
+globalJournalSum: 0.00
+reconciliationBalanced: true
+errors: 0

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Plane — Arbiter</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow: hidden; }
+    .dash-wrapper {
+      display: grid;
+      grid-template-rows: 68px 1fr 160px;
+      height: calc(100vh - 46px);
+      overflow: hidden;
+    }
+    .dash-body {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      overflow: hidden;
+      border-top: 1px solid var(--border-dim);
+    }
+    .dash-left {
+      overflow-y: auto;
+      border-right: 1px solid var(--border-base);
+      display: flex; flex-direction: column;
+    }
+    .dash-right {
+      overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+    .dash-audit { border-top: 1px solid var(--border-base); overflow: hidden; }
+    .console-wrap { flex: 1; display: flex; flex-direction: column; }
+    .response-log { flex: 1; min-height: 140px; }
+    .accounts-table-wrap { flex: 1; overflow-y: auto; min-height: 120px; }
+    .right-section { border-bottom: 1px solid var(--border-dim); }
+    .right-section:last-child { border-bottom: none; flex: 1; }
+    .audit-scroll { height: 112px; overflow-y: auto; }
+    .gate-shown .console-forms { display: none; }
+    .gate-shown .auth-gate { display: flex; }
+    .console-forms { display: flex; flex-direction: column; flex: 1; }
+    .auth-gate { display: none; }
+    .unlocked .console-forms { display: flex; }
+    .unlocked .auth-gate { display: none; }
+    .locked   .console-forms { display: none; }
+    .locked   .auth-gate { display: flex; }
+    .api-key-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      background: var(--bg-void);
+      border-bottom: 1px solid var(--border-dim);
+      font-family: var(--font-mono); font-size: 10px;
+    }
+    .api-key-label { color: var(--text-muted); flex-shrink: 0; }
+    .api-key-val { color: var(--cyan); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .api-key-status { color: var(--green); font-weight: 700; }
+    .api-key-status.locked-status { color: var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav class="nav">
+  <a href="index.html" class="nav-logo">ARBITER<em>.sys</em></a>
+  <div class="nav-divider"></div>
+  <ul class="nav-links">
+    <li><a href="index.html" class="">Overview</a></li>
+    <li><a href="dashboard.html" class="active">Control Plane</a></li>
+    <li><a href="ledger.html" class="">Ledger</a></li>
+    <li><a href="api.html" class="">API Ref</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="nav-status">
+      <div class="status-dot" id="nav-dot"></div>
+      <span id="nav-status">CONNECTING…</span>
+    </div>
+  </div>
+</nav>
+
+<div class="dash-wrapper">
+
+  <!-- ═══ PROOF STRIP ═══ -->
+  <div class="proof-strip">
+    <div class="proof-cell">
+      <div class="proof-label">DURABLE_REQ</div>
+      <div class="proof-value" id="ps-req">—</div>
+      <div class="proof-tag tag-green">APPEND-ONLY</div>
+    </div>
+    <div class="proof-cell">
+      <div class="proof-label">DUP_ATTEMPTS</div>
+      <div class="proof-value" id="ps-dup">—</div>
+      <div class="proof-tag tag-amber">NO-REPLAY</div>
+    </div>
+    <div class="proof-cell">
+      <div class="proof-label">JOURNAL_SUM</div>
+      <div class="proof-value balanced" id="ps-sum">—</div>
+      <div class="proof-tag tag-green">BALANCED</div>
+    </div>
+    <div class="proof-cell">
+      <div class="proof-label">P99_LATENCY</div>
+      <div class="proof-value" id="ps-lat">—</div>
+      <div class="proof-tag tag-cyan">FSYNC_DUR</div>
+    </div>
+    <div class="proof-cell">
+      <div class="proof-label">ERRORS</div>
+      <div class="proof-value" id="ps-err">—</div>
+      <div class="proof-tag tag-green">GATE_PASS</div>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN BODY ═══ -->
+  <div class="dash-body">
+
+    <!-- LEFT: Operations Console -->
+    <div class="dash-left">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="dot"></span>
+          OPERATIONS_CONSOLE
+        </div>
+        <div class="flex gap-2 items-center">
+          <div id="auth-badge" class="panel-badge badge-red">AUTH_REQUIRED</div>
+        </div>
+      </div>
+
+      <!-- API Key bar -->
+      <div class="api-key-bar">
+        <span class="api-key-label">API_KEY:</span>
+        <span class="api-key-val" id="key-display">not authorised</span>
+        <span class="api-key-status locked-status" id="key-status">LOCKED</span>
+      </div>
+
+      <!-- Auth Gate or Console -->
+      <div id="console-area" class="locked console-wrap">
+
+        <!-- AUTH GATE -->
+        <div class="auth-gate">
+          <div class="auth-gate-icon">🔐</div>
+          <div class="auth-gate-title">AUTHORISATION REQUIRED</div>
+          <p class="auth-gate-desc">Enter your API key to inject commands into the settlement engine.</p>
+          <div class="auth-input-row">
+            <input class="form-input w-full" type="password" id="api-key-input" placeholder="arb_live_••••••••••••••••" />
+            <button class="btn btn-primary btn-sm" id="auth-btn">UNLOCK</button>
+          </div>
+          <p style="font-family: var(--font-mono); font-size: 9px; color: var(--text-faint);">Hint: try  <span style="color:var(--amber)">arbiter-demo-key</span></p>
+        </div>
+
+        <!-- UNLOCKED FORMS -->
+        <div class="console-forms">
+          <!-- Tabs -->
+          <div class="tab-bar">
+            <button class="tab-btn active" data-tab="acct">ACCOUNT_INIT</button>
+            <button class="tab-btn" data-tab="pay">PAYMENT_TX</button>
+            <button class="tab-btn" data-tab="iso">ISO_20022</button>
+          </div>
+
+          <!-- Account Init -->
+          <div class="tab-panel active" id="tab-acct">
+            <div class="form-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="acct-id">ACCOUNT_ID</label>
+                  <input class="form-input" type="text" id="acct-id" placeholder="ACC-001" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="acct-ccy">CURRENCY</label>
+                  <input class="form-input" type="text" id="acct-ccy" placeholder="USD" maxlength="3" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="acct-bal">OPENING_BALANCE</label>
+                <input class="form-input" type="number" id="acct-bal" placeholder="10000.00" step="0.01" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary btn-sm" id="btn-init-acct">EXECUTE</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearForm('acct')">CLEAR</button>
+            </div>
+          </div>
+
+          <!-- Payment TX -->
+          <div class="tab-panel" id="tab-pay">
+            <div class="form-body">
+              <div class="form-group">
+                <label class="form-label" for="pay-e2e">END_TO_END_ID</label>
+                <input class="form-input" type="text" id="pay-e2e" placeholder="E2E-2024-0001" />
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="pay-debtor">DEBTOR_ACCOUNT</label>
+                  <input class="form-input" type="text" id="pay-debtor" placeholder="ACC-001" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="pay-creditor">CREDITOR_ACCOUNT</label>
+                  <input class="form-input" type="text" id="pay-creditor" placeholder="ACC-002" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="pay-amt">AMOUNT</label>
+                  <input class="form-input" type="number" id="pay-amt" placeholder="500.00" step="0.01" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="pay-ccy">CURRENCY</label>
+                  <input class="form-input" type="text" id="pay-ccy" placeholder="USD" maxlength="3" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="pay-purpose">PURPOSE_CODE</label>
+                <input class="form-input" type="text" id="pay-purpose" placeholder="SUPP" maxlength="4" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary btn-sm" id="btn-pay">SETTLE</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearForm('pay')">CLEAR</button>
+              <button class="btn btn-ghost btn-sm" id="btn-gen-e2e">GEN_E2E_ID</button>
+            </div>
+          </div>
+
+          <!-- ISO 20022 -->
+          <div class="tab-panel" id="tab-iso">
+            <div class="form-body">
+              <div class="form-group">
+                <label class="form-label" for="iso-xml">PAIN.001 XML PAYLOAD</label>
+                <textarea class="form-input" id="iso-xml" style="min-height:180px;" placeholder="&lt;?xml version=&quot;1.0&quot;?&gt;&#10;&lt;Document xmlns=&quot;urn:iso:std:iso:20022:tech:xsd:pain.001.001.03&quot;&gt;&#10;  &lt;CstmrCdtTrfInitn&gt;&#10;    ...&#10;  &lt;/CstmrCdtTrfInitn&gt;&#10;&lt;/Document&gt;"></textarea>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary btn-sm" id="btn-iso">INJECT</button>
+              <button class="btn btn-ghost btn-sm" id="btn-iso-sample">LOAD_SAMPLE</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearForm('iso')">CLEAR</button>
+            </div>
+          </div>
+
+          <!-- Response Log -->
+          <div class="panel-header" style="border-top: 1px solid var(--border-dim);">
+            <div class="panel-title"><span class="dot live"></span>RESPONSE_LOG</div>
+            <button class="btn btn-ghost btn-sm" onclick="clearLog()">CLEAR</button>
+          </div>
+          <div class="terminal response-log" id="response-log">
+            <div class="t-line"><span class="t-ts">--:--:--</span><span class="t-tag info">SYS</span><span class="t-msg">Console ready. Execute a command above.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Ledger State -->
+    <div class="dash-right">
+
+      <!-- Accounts Table -->
+      <div class="right-section" style="flex: 1; display: flex; flex-direction: column; min-height: 200px;">
+        <div class="panel-header">
+          <div class="panel-title"><span class="dot live"></span>LEDGER_ACCOUNTS</div>
+          <div class="panel-badge badge-cyan" id="acct-count">0 ACCTS</div>
+        </div>
+        <div class="accounts-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ACCOUNT_ID</th>
+                <th>CCY</th>
+                <th>BALANCE</th>
+              </tr>
+            </thead>
+            <tbody id="accounts-tbody">
+              <tr><td colspan="3" style="text-align:center; padding: 24px; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);">NO ACCOUNTS INITIALISED</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reconciliation Engine -->
+      <div class="right-section">
+        <div class="panel-header">
+          <div class="panel-title"><span class="dot live"></span>RECONCILIATION_ENGINE</div>
+          <div class="panel-badge badge-green" id="recon-badge">BALANCED</div>
+        </div>
+        <div class="recon-grid">
+          <div class="recon-cell">
+            <div class="recon-label">ENTRY_COUNT</div>
+            <div class="recon-value" id="recon-entries">0</div>
+          </div>
+          <div class="recon-cell">
+            <div class="recon-label">ISSUE_COUNT</div>
+            <div class="recon-value healthy" id="recon-issues">0</div>
+          </div>
+          <div class="recon-cell">
+            <div class="recon-label">LAST_CHECK</div>
+            <div class="recon-value" id="recon-ts" style="font-size: 13px;">—</div>
+          </div>
+          <div class="recon-cell">
+            <div class="recon-label">JOURNAL_DELTA</div>
+            <div class="recon-value healthy" id="recon-delta">0.00</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ AUDIT STREAM ═══ -->
+  <div class="dash-audit">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot live"></span>SECURITY_AUDIT_STREAM — IMMUTABLE EVENT LOG</div>
+      <div class="flex gap-2">
+        <div class="panel-badge badge-green" id="audit-count">0 EVENTS</div>
+        <button class="btn btn-ghost btn-sm" onclick="clearAudit()">CLEAR</button>
+      </div>
+    </div>
+    <div class="audit-scroll audit-list" id="audit-list">
+      <div class="audit-entry">
+        <span class="a-ts">--:--:--</span>
+        <span class="a-type SYSTEM">SYSTEM</span>
+        <span class="a-msg">Arbiter settlement engine initialised. Awaiting commands.</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /dash-wrapper -->
+
+<script>
+const API = 'http://localhost:8080';
+let apiKey = null;
+let accounts = {};
+let auditCount = 0;
+let entryCount = 0;
+let state = { req: 0, dup: 0, lat: 0, err: 0 };
+
+// ─── Tab switcher ───
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+  });
+});
+
+// ─── Auth ───
+document.getElementById('auth-btn').addEventListener('click', authenticate);
+document.getElementById('api-key-input').addEventListener('keydown', e => { if(e.key==='Enter') authenticate(); });
+
+function authenticate() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) return;
+  apiKey = val;
+  document.getElementById('console-area').className = 'unlocked console-wrap';
+  document.getElementById('auth-badge').textContent = 'AUTHORISED';
+  document.getElementById('auth-badge').className = 'panel-badge badge-green';
+  document.getElementById('key-display').textContent = val.slice(0,6) + '••••••••••' + val.slice(-4);
+  document.getElementById('key-status').textContent = 'UNLOCKED';
+  document.getElementById('key-status').className = 'api-key-status';
+  logResponse('ok', 'SYS', `API key accepted. Console unlocked.`);
+  appendAudit('SYSTEM', 'Console authorised. Operations enabled.');
+}
+
+// ─── Account Init ───
+document.getElementById('btn-init-acct').addEventListener('click', async () => {
+  const id  = document.getElementById('acct-id').value.trim();
+  const ccy = document.getElementById('acct-ccy').value.trim().toUpperCase();
+  const bal = parseFloat(document.getElementById('acct-bal').value);
+  if (!id || !ccy || isNaN(bal)) { logResponse('err','VAL','Missing required fields.'); return; }
+
+  const body = { accountId: id, currency: ccy, openingBalance: bal };
+  logResponse('info','REQ', `POST /accounts → ${JSON.stringify(body)}`);
+
+  try {
+    const r = await fetch(`${API}/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5000)
+    });
+    const d = await r.json();
+    logResponse(r.ok?'ok':'err','RES', JSON.stringify(d, null, 2));
+    if (r.ok) { updateAccount(id, ccy, bal); appendAudit('ACCOUNT', `ACC ${id} initialised · ${bal.toFixed(2)} ${ccy}`); }
+  } catch(e) {
+    logResponse('warn','SIM', `Backend offline — simulating account creation`);
+    updateAccount(id, ccy, bal);
+    appendAudit('ACCOUNT', `ACC ${id} initialised · ${bal.toFixed(2)} ${ccy}`);
+    simulateMetricTick();
+    entryCount += 1;
+  }
+});
+
+// ─── Payment TX ───
+document.getElementById('btn-pay').addEventListener('click', async () => {
+  const e2e     = document.getElementById('pay-e2e').value.trim();
+  const debtor  = document.getElementById('pay-debtor').value.trim();
+  const creditor= document.getElementById('pay-creditor').value.trim();
+  const amount  = parseFloat(document.getElementById('pay-amt').value);
+  const ccy     = document.getElementById('pay-ccy').value.trim().toUpperCase();
+  const purpose = document.getElementById('pay-purpose').value.trim() || 'SUPP';
+  if (!e2e||!debtor||!creditor||isNaN(amount)||!ccy) { logResponse('err','VAL','Missing required fields.'); return; }
+
+  const body = { endToEndId:e2e, debtorAccountId:debtor, creditorAccountId:creditor, amount, currency:ccy, purposeCode:purpose };
+  logResponse('info','REQ', `POST /payments → ${JSON.stringify(body)}`);
+
+  try {
+    const r = await fetch(`${API}/payments`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-API-Key':apiKey},
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5000)
+    });
+    const d = await r.json();
+    logResponse(r.ok?'ok':'err','RES', JSON.stringify(d,null,2));
+    if(r.status===409){ appendAudit('PAYMENT',`DUP BLOCKED · e2eId=${e2e}`); state.dup++; }
+    if(r.ok){ applyPayment(debtor, creditor, amount); appendAudit('PAYMENT',`SETTLED · ${e2e} · ${debtor} → ${creditor} · ${amount.toFixed(2)} ${ccy}`); entryCount+=2; }
+  } catch(e) {
+    logResponse('warn','SIM','Backend offline — simulating settlement');
+    applyPayment(debtor, creditor, amount);
+    appendAudit('PAYMENT', `SETTLED · ${e2e} · ${debtor} → ${creditor} · ${amount.toFixed(2)} ${ccy}`);
+    entryCount += 2;
+    simulateMetricTick();
+  }
+});
+
+// ─── Gen E2E ID ───
+document.getElementById('btn-gen-e2e').addEventListener('click', () => {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rnd = Math.random().toString(36).substring(2,6).toUpperCase();
+  document.getElementById('pay-e2e').value = `E2E-${ts}-${rnd}`;
+});
+
+// ─── ISO 20022 ───
+document.getElementById('btn-iso-sample').addEventListener('click', () => {
+  document.getElementById('iso-xml').value = `<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03">
+  <CstmrCdtTrfInitn>
+    <GrpHdr>
+      <MsgId>MSG-${Date.now()}</MsgId>
+      <CreDtTm>${new Date().toISOString()}</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <CtrlSum>500.00</CtrlSum>
+    </GrpHdr>
+    <PmtInf>
+      <PmtInfId>PMT-001</PmtInfId>
+      <PmtMtd>TRF</PmtMtd>
+      <CdtTrfTxInf>
+        <PmtId>
+          <EndToEndId>E2E-ISO-${Date.now()}</EndToEndId>
+        </PmtId>
+        <Amt>
+          <InstdAmt Ccy="USD">500.00</InstdAmt>
+        </Amt>
+        <Dbtr><Nm>ACC-001</Nm></Dbtr>
+        <DbtrAcct><Id><Othr><Id>ACC-001</Id></Othr></Id></DbtrAcct>
+        <Cdtr><Nm>ACC-002</Nm></Cdtr>
+        <CdtrAcct><Id><Othr><Id>ACC-002</Id></Othr></Id></CdtrAcct>
+      </CdtTrfTxInf>
+    </PmtInf>
+  </CstmrCdtTrfInitn>
+</Document>`;
+});
+
+document.getElementById('btn-iso').addEventListener('click', async () => {
+  const xml = document.getElementById('iso-xml').value.trim();
+  if (!xml) { logResponse('err','VAL','ISO 20022 XML payload required.'); return; }
+  logResponse('info','REQ',`POST /payments/iso20022 (PAIN.001, ${xml.length} bytes)`);
+  try {
+    const r = await fetch(`${API}/payments/iso20022`, {
+      method:'POST',
+      headers:{'Content-Type':'application/xml','X-API-Key':apiKey},
+      body: xml, signal: AbortSignal.timeout(5000)
+    });
+    const text = await r.text();
+    logResponse(r.ok?'ok':'err','RES',text);
+    if(r.ok) appendAudit('PAYMENT',`ISO 20022 PAIN.001 injected and settled`);
+  } catch(e) {
+    logResponse('warn','SIM','Backend offline — ISO 20022 injection simulated');
+    appendAudit('PAYMENT','ISO 20022 PAIN.001 injected (simulation mode)');
+    entryCount += 2; simulateMetricTick();
+  }
+});
+
+// ─── Helpers ───
+function updateAccount(id, ccy, bal) {
+  accounts[id] = { ccy, bal: (accounts[id]?.bal ?? 0) + bal };
+  renderAccounts();
+}
+
+function applyPayment(debtor, creditor, amount) {
+  if (accounts[debtor])  accounts[debtor].bal  -= amount;
+  if (accounts[creditor]) accounts[creditor].bal += amount;
+  state.req++;
+  renderAccounts();
+  runRecon();
+}
+
+function renderAccounts() {
+  const tbody = document.getElementById('accounts-tbody');
+  const entries = Object.entries(accounts);
+  document.getElementById('acct-count').textContent = `${entries.length} ACCTS`;
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:24px;font-family:var(--font-mono);font-size:10px;color:var(--text-faint);">NO ACCOUNTS INITIALISED</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries.map(([id,{ccy,bal}]) => {
+    const cls = bal > 0 ? 'td-pos' : bal < 0 ? 'td-neg' : '';
+    return `<tr>
+      <td class="td-id">${id}</td>
+      <td class="td-neutral">${ccy}</td>
+      <td class="td-amount ${cls}">${bal.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function runRecon() {
+  const sum = Object.values(accounts).reduce((a,v) => a + v.bal, 0);
+  const issues = Math.abs(sum) > 0.001 ? 1 : 0;
+  document.getElementById('recon-entries').textContent = entryCount;
+  const issEl = document.getElementById('recon-issues');
+  issEl.textContent = issues;
+  issEl.className = 'recon-value ' + (issues ? 'critical' : 'healthy');
+  const deltaEl = document.getElementById('recon-delta');
+  deltaEl.textContent = sum.toFixed(2);
+  deltaEl.className = 'recon-value ' + (issues ? 'critical' : 'healthy');
+  document.getElementById('recon-badge').textContent = issues ? 'IMBALANCED' : 'BALANCED';
+  document.getElementById('recon-badge').className = 'panel-badge ' + (issues ? 'badge-red' : 'badge-green');
+  document.getElementById('recon-ts').textContent = new Date().toLocaleTimeString('en-US',{hour12:false});
+}
+
+function logResponse(type, tag, msg) {
+  const log = document.getElementById('response-log');
+  const ts = new Date().toLocaleTimeString('en-US',{hour12:false});
+  const formatted = msg.length > 400 ? msg.slice(0,400) + '\n…(truncated)' : msg;
+  const div = document.createElement('div');
+  div.className = 't-line';
+  div.innerHTML = `<span class="t-ts">${ts}</span><span class="t-tag ${type}">${tag}</span><span class="t-msg"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;color:var(--text-secondary)">${escHtml(formatted)}</pre></span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function appendAudit(type, msg) {
+  auditCount++;
+  const list = document.getElementById('audit-list');
+  const ts = new Date().toLocaleTimeString('en-US',{hour12:false});
+  const div = document.createElement('div');
+  div.className = 'audit-entry';
+  div.innerHTML = `<span class="a-ts">${ts}</span><span class="a-type ${type}">${type}</span><span class="a-msg">${escHtml(msg)}</span>`;
+  list.prepend(div);
+  document.getElementById('audit-count').textContent = `${auditCount} EVENTS`;
+}
+
+function clearLog() { document.getElementById('response-log').innerHTML = ''; }
+function clearAudit() { document.getElementById('audit-list').innerHTML = ''; auditCount = 0; document.getElementById('audit-count').textContent = '0 EVENTS'; }
+function clearForm(type) {
+  if(type==='acct') { ['acct-id','acct-ccy','acct-bal'].forEach(id => document.getElementById(id).value=''); }
+  if(type==='pay')  { ['pay-e2e','pay-debtor','pay-creditor','pay-amt','pay-ccy','pay-purpose'].forEach(id => document.getElementById(id).value=''); }
+  if(type==='iso')  { document.getElementById('iso-xml').value=''; }
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmt(n) { return Number(n).toLocaleString(); }
+function tick(id, val) {
+  const el = document.getElementById(id); if(!el) return;
+  if(el.textContent !== String(val)) { el.textContent = val; el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+}
+
+function simulateMetricTick() {
+  state.req++; state.lat = Math.floor(Math.random()*200+700);
+  tick('ps-req', fmt(state.req));
+  tick('ps-dup', fmt(state.dup));
+  tick('ps-sum', '0.00');
+  tick('ps-lat', `${state.lat}μs`);
+  tick('ps-err', fmt(state.err));
+}
+
+async function pollMetrics() {
+  try {
+    const r = await fetch(`${API}/metrics`, {signal: AbortSignal.timeout(2500)});
+    if(r.ok) {
+      const d = await r.json();
+      tick('ps-req', fmt(d.totalRequests));
+      tick('ps-dup', fmt(d.duplicateAttempts));
+      tick('ps-sum', d.journalSum.toFixed(2));
+      tick('ps-lat', `${d.p99LatencyUs}μs`);
+      tick('ps-err', fmt(d.errors));
+      document.getElementById('nav-dot').className = 'status-dot';
+      document.getElementById('nav-status').textContent = 'NOMINAL';
+      return;
+    }
+  } catch {}
+  state.req += Math.floor(Math.random()*3);
+  state.lat = Math.floor(Math.random()*200+700);
+  tick('ps-req', fmt(state.req));
+  tick('ps-dup', fmt(state.dup));
+  tick('ps-sum', '0.00');
+  tick('ps-lat', `${state.lat}μs`);
+  tick('ps-err', '0');
+  document.getElementById('nav-dot').className = 'status-dot offline';
+  document.getElementById('nav-status').textContent = 'DEMO_MODE';
+}
+
+// ─── Reconciliation auto-poll ───
+async function pollRecon() {
+  try {
+    const r = await fetch(`${API}/reconcile`, {signal: AbortSignal.timeout(2500)});
+    if(r.ok) {
+      const d = await r.json();
+      document.getElementById('recon-entries').textContent = d.entryCount ?? entryCount;
+      const issues = d.issueCount ?? 0;
+      const issEl = document.getElementById('recon-issues');
+      issEl.textContent = issues;
+      issEl.className = 'recon-value ' + (issues?'critical':'healthy');
+      document.getElementById('recon-delta').textContent = (d.journalSum ?? 0).toFixed(2);
+      document.getElementById('recon-ts').textContent = new Date().toLocaleTimeString('en-US',{hour12:false});
+    }
+  } catch {}
+}
+
+pollMetrics(); setInterval(pollMetrics, 2000);
+pollRecon();   setInterval(pollRecon, 5000);
+runRecon();
+</script>
+</body>
+</html>

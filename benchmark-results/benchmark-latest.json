@@ -1,0 +1,23 @@
+{
+  "completedAt": "2026-09-12T14:44:58.142204Z",
+  "requestedSettlements": 10000,
+  "settled": 10000,
+  "duplicateAttempts": 10000,
+  "duplicateResponses": 10000,
+  "requestedFraudDeclines": 1000,
+  "fraudDeclines": 1000,
+  "errors": 0,
+  "workers": 8,
+  "settlementSeconds": 205.541,
+  "settlementsPerSecond": 48.652,
+  "p50Micros": 156649,
+  "p95Micros": 227615,
+  "p99Micros": 470084,
+  "duplicateSeconds": 30.186,
+  "duplicateResponsesPerSecond": 331.275,
+  "fraudSeconds": 12.065,
+  "fraudDeclinesPerSecond": 82.882,
+  "journalEntryCount": 20000,
+  "globalJournalSum": "0.00",
+  "reconciliationBalanced": true
+}

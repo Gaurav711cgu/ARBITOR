@@ -1,0 +1,8 @@
+out/
+data/
+benchmark-results/*.tmp
+.DS_Store
+*.class
+node_modules/
+out/
+.DS_Store

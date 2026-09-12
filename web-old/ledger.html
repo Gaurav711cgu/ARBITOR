@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ledger — Arbiter</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow-y: scroll; }
+    .page-wrapper {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 32px 64px 32px;
+    }
+    
+    /* Toolbar Pattern */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-base);
+      margin: 32px 0 24px;
+      gap: 16px;
+    }
+    .filter-group { display: flex; gap: 12px; }
+    .filter-input {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-dim);
+      color: var(--text-primary);
+      padding: 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      transition: all var(--fast);
+    }
+    .filter-input:focus {
+      border-color: var(--amber);
+      outline: none;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border-base);
+      color: var(--text-primary);
+      padding: 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all var(--base);
+    }
+    .btn-outline:hover {
+      background: var(--bg-hover);
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    /* Data Table Pattern */
+    .table-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-base);
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: var(--bg-elevated);
+      padding: 16px 24px;
+      text-align: left;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-base);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-deep);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+    tr:hover td {
+      background: var(--bg-hover);
+    }
+    .status-tag {
+      padding: 4px 8px;
+      font-size: 10px;
+      background: var(--green-dim);
+      color: var(--green);
+      border-radius: var(--r1);
+      border: 1px solid rgba(0, 200, 150, 0.2);
+    }
+    
+    .page-title {
+      font-family: var(--font-ui);
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 48px;
+    }
+    .page-subtitle {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body class="theme-dark">
+
+  <!-- Top Navigation -->
+  <nav class="nav">
+  <a href="index.html" class="nav-logo">ARBITER<em>.sys</em></a>
+  <div class="nav-divider"></div>
+  <ul class="nav-links">
+    <li><a href="index.html" class="">Overview</a></li>
+    <li><a href="dashboard.html" class="">Control Plane</a></li>
+    <li><a href="ledger.html" class="active">Ledger</a></li>
+    <li><a href="api.html" class="">API Ref</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="nav-status">
+      <div class="status-dot" id="nav-dot"></div>
+      <span id="nav-status">CONNECTING…</span>
+    </div>
+  </div>
+</nav>
+
+  <div class="page-wrapper">
+    <h1 class="page-title">Ledger Explorer</h1>
+    <p class="page-subtitle">Immutable double-entry journal and real-time state vectors.</p>
+    
+    <!-- Filter Bar Pattern -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <input type="text" class="filter-input" placeholder="Search Tx ID...">
+        <input type="text" class="filter-input" placeholder="Filter Account...">
+        <select class="filter-input">
+          <option value="ALL">ALL STATUS</option>
+          <option value="SETTLED">SETTLED</option>
+          <option value="FAILED">FAILED</option>
+        </select>
+      </div>
+      <button class="btn-outline" onclick="loadLedger()">[ REFRESH ]</button>
+    </div>
+
+    <!-- Data Table Pattern -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Tx ID</th>
+            <th>Account</th>
+            <th>Counterparty</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Currency</th>
+            <th>Status</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody id="ledger-body">
+          <tr>
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:12px;"><div style="font-size:24px;color:var(--text-faint);">◎</div><div>SYNCING LEDGER DATA...</div><div style="font-size:11px;color:var(--text-faint);">Waiting for ledger synchronization</div></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API = localStorage.getItem('arbiter_api_url') || 'http://localhost:8080';
+    const apiKey = localStorage.getItem('arbiterApiKey');
+    
+    async function loadLedger() {
+      if (!apiKey) {
+        document.getElementById('ledger-body').innerHTML = `
+          <tr><td colspan="8" style="text-align:center; color: var(--amber);">
+            <div style='display:flex;flex-direction:column;align-items:center;gap:12px;'><div style='font-size:24px;color:var(--amber-dim);'>⚠</div><div style='color:var(--amber);'>AUTHORIZATION REQUIRED</div><div style='font-size:11px;color:var(--text-faint);'>Please insert API key in Control Plane</div></div>
+          </td></tr>`;
+        return;
+      }
+      
+      try {
+        const r = await fetch(`${API}/accounts`, {
+          headers: { 'X-API-Key': apiKey }
+        });
+        
+        if (!r.ok) throw new Error('API Request Failed');
+        
+        const accounts = await r.json();
+        
+        // This is a mockup of journal entries since /accounts only gives balances,
+        // but we can at least show the accounts in the ledger for now!
+        const html = accounts.map(a => `
+          <tr>
+            <td>N/A (State)</td>
+            <td style="color: var(--amber)">${a.accountId}</td>
+            <td>-</td>
+            <td>BALANCE</td>
+            <td>${a.balance}</td>
+            <td>${a.currency}</td>
+            <td><span class="status-tag">ACTIVE</span></td>
+            <td>${new Date().toISOString()}</td>
+          </tr>
+        `).join('');
+        
+        document.getElementById('ledger-body').innerHTML = html;
+        
+      } catch (err) {
+        document.getElementById('ledger-body').innerHTML = `
+          <tr><td colspan="8" style="text-align:center; color: var(--red);">
+            <div style='display:flex;flex-direction:column;align-items:center;gap:12px;'><div style='font-size:24px;color:var(--red-dim);'>✕</div><div style='color:var(--red);'>CONNECTION FAILED</div><div style='font-size:11px;color:var(--text-faint);'>Unable to reach Arbiter backend</div></div>
+          </td></tr>`;
+      }
+    }
+    
+    loadLedger();
+  </script>
+</body>
+</html>
