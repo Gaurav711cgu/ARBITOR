@@ -22,6 +22,8 @@ public interface LedgerRepository {
 
     List<JournalEntry> allEntries();
 
+    List<String> getRecentTransactions();
+
     void postAtomically(String transactionId, JournalEntry debitEntry, JournalEntry creditEntry);
 
     void assertCanDebit(String accountId, BigDecimal amount, String currency);
